@@ -101,14 +101,16 @@ void loop() {
   if (isnan(humidity) || isnan(temperature)) {
     Serial.println("Failed to read from DHT22");
   } else {
-    Serial.print("Humidity : ");
+    Serial.println("##########################################");
+    Serial.println("#");
+    Serial.print("# Humidity : ");
     Serial.print(humidity);
     Serial.print(" %\n");
-    Serial.println("---------------------");
-    Serial.print("Temperature : ");
+    Serial.println("# ----------------------------------------");
+    Serial.print("# Temperature : ");
     Serial.print(temperature);
     Serial.println(" °C");
-    Serial.println("---------------------");
+    Serial.println("# ----------------------------------------");
   }
 
   int soilAnalog = analogRead(SOIL_AO);   // 0–4095
@@ -116,12 +118,12 @@ void loop() {
 
   int soilDigital = digitalRead(SOIL_DO); // 0 = เปียก, 1 = แห้ง
 
-  Serial.print("Soil moisture (analog) : ");
+  Serial.print("# Soil moisture (analog) : ");
   Serial.print(soilAnalog);
   Serial.print(" -> ");
   Serial.print(soilPercent);
   Serial.println(" %");
-  Serial.println("---------------------");
+  Serial.println("# ----------------------------------------");
 
   Serial.print("Soil moisture (digital) : ");
   Serial.println(soilDigital == 0 ? "Wet" : "Dry");
