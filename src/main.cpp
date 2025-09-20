@@ -10,9 +10,9 @@ DHT dht(DHTPIN, DHTTYPE);
 #define SOIL_AO 34   
 #define SOIL_DO 27
 
-const char* ssid = "POCOX4"; // Replace with your WiFi SSID
-const char* password = "11111111"; // Replace with your WiFi password
-const char* mqtt_server = "10.12.49.85"; // Replace with
+const char* ssid = "ROG-KOTORISAKI"; // Replace with your WiFi SSID
+const char* password = "0951034031"; // Replace with your WiFi password
+const char* mqtt_server = "192.168.137.191"; // Replace with
 const int mqtt_port = 1883; // Replace with your MQTT broker port if different
 
 const char* mqtt_publish_topic = "esp32/output"; // Topic to publish sensor data
