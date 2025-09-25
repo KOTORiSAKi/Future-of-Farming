@@ -114,11 +114,12 @@ void setup()
   digitalWrite(P_SPRAY_PIN, HIGH);
   pinMode(BEEP_PIN, OUTPUT);
   digitalWrite(BEEP_PIN, OUTPUT);
-  digitalWrite(BEEP_PIN, LOW); // Set initial state to OFF
+  digitalWrite(BEEP_PIN, HIGH); // Set initial state to OFF
 }
 
 void loop()
 {
+  srand(time(NULL));
   unsigned long current_time = millis();
 
   if (!client.connected())
@@ -131,6 +132,9 @@ void loop()
   delay(2000); // Read Every 2 Sec
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
+
+  //humidity = 0;
+  //temperature = 30;
 
   if (isnan(humidity) || isnan(temperature))
   {
@@ -172,13 +176,13 @@ void loop()
   Serial.println("# ----------------------------------------");
 
   static bool W_active = false; // Water spray status
-  if (humidity< 90 && W_active == false)
+  if (humidity< 60 && W_active == false)
   {                                 // If soil is dry
     digitalWrite(W_SPRAY_PIN, LOW); // Turn on water spray (LED ON)
     Serial.println("# Water Spray: ON");
     W_active = true;
   }
-  else if (humidity >= 90 && W_active == true)
+  else if (humidity >= 60 && W_active == true)
   {
     digitalWrite(W_SPRAY_PIN, LOW);  // Turn off water spray (LED OFF)
     delay(100);                      // Small delay to ensure the LED state is set before printing
@@ -205,7 +209,7 @@ void loop()
     P_active = false;
   }
   // Turn on the pump if soil is dry and it hasn't been activated in the last 10 seconds
-  if (!P_active && soilPercent < 50 && (millis() - last_pump_activation_time >= 10000))
+  if (!P_active && soilPercent < 30 && (millis() - last_pump_activation_time >= 10000))
   {
     digitalWrite(P_SPRAY_PIN, LOW); // Turn on water pump (LED ON)
     Serial.println("# Water Pump ON");
@@ -214,12 +218,12 @@ void loop()
   }
   Serial.println("# ----------------------------------------");
 
-  if (temperature > 32)
+  if (temperature > 28)
   {
     Serial.println("# It's too hot!");
     digitalWrite(BEEP_PIN, HIGH); // Turn on buzzer (LED ON)
   }
-  else if (temperature < 20) // Corrected logic for "too cold"
+  else if (temperature < 10) // Corrected logic for "too cold"
   {
     Serial.println("# It's too cold!");
     digitalWrite(BEEP_PIN, HIGH); // Turn off buzzer (LED OFF)
