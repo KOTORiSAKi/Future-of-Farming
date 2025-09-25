@@ -4,7 +4,7 @@
 #include "DHT.h"
 #include <time.h>
 
-#define DHTPIN 26
+#define DHTPIN 27
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -12,11 +12,14 @@ DHT dht(DHTPIN, DHTTYPE);
 #define SOIL_DO 27
 #define LDR_PIN 32 // GPIO pin connected to the LDR
 
+#define BEEP_PIN 13 // GPIO pin connected to the onboard LED
+
 #define W_SPRAY_PIN 33 // GPIO pin connected to the onboard LED
 #define P_SPRAY_PIN 25 // GPIO pin connected to the onboard LED
 
-static unsigned long when_activated; // Declare as static to retain value across loop calls
-static unsigned long MQTT_activated; // Declare as static to retain value across loop calls
+
+static unsigned long last_pump_activation_time = 0;
+static unsigned long last_mqtt_publish_time = 0;
 
 const char *ssid = "ROG-KOTORISAKI";         // Replace with your WiFi SSID
 const char *password = "0951034031";         // Replace with your WiFi password
@@ -98,9 +101,6 @@ void setup()
   Serial.begin(9600);
   Serial.println("Starting...");
 
-  when_activated = millis() / 1000;
-  MQTT_activated = millis() / 1000;
-
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
@@ -112,17 +112,23 @@ void setup()
   digitalWrite(W_SPRAY_PIN, HIGH);
   pinMode(P_SPRAY_PIN, OUTPUT);
   digitalWrite(P_SPRAY_PIN, HIGH);
+  pinMode(BEEP_PIN, OUTPUT);
+  digitalWrite(BEEP_PIN, OUTPUT);
+  digitalWrite(BEEP_PIN, LOW); // Set initial state to OFF
 }
 
 void loop()
 {
-  delay(1000); // Read Every 1 Sec
+  unsigned long current_time = millis();
+
   if (!client.connected())
   {
     reconnect();
   }
   client.loop();
 
+  // It's better to use non-blocking delays for sensor reading
+  delay(2000); // Read Every 2 Sec
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
 
@@ -166,13 +172,13 @@ void loop()
   Serial.println("# ----------------------------------------");
 
   static bool W_active = false; // Water spray status
-  if (soilPercent < 50 && W_active == false)
+  if (humidity< 90 && W_active == false)
   {                                 // If soil is dry
     digitalWrite(W_SPRAY_PIN, LOW); // Turn on water spray (LED ON)
     Serial.println("# Water Spray: ON");
     W_active = true;
   }
-  else if (soilPercent >= 50 && W_active == true)
+  else if (humidity >= 90 && W_active == true)
   {
     digitalWrite(W_SPRAY_PIN, LOW);  // Turn off water spray (LED OFF)
     delay(100);                      // Small delay to ensure the LED state is set before printing
@@ -182,36 +188,57 @@ void loop()
     Serial.println("# Water Spray: OFF");
     W_active = false;
   }
-  delay(100);                      // Small delay to ensure the LED state is set before printing
+  delay(100);                // Small delay to ensure the LED state is set before printing
   digitalWrite(W_SPRAY_PIN, HIGH); // Ensure water spray is off after check
   Serial.println("Status: Default");
   Serial.println("----------------------------------------");
 
+  // Corrected Water Pump logic using millis()
   static bool P_active = false; // Water pump status
-  if ((millis() / 1000) - when_activated >= 1 && P_active == true)
-  {                                 // If 1 second has passed
+  static unsigned long last_pump_activation_time = 0;
+
+  // Check if the pump has been active for 10 seconds and turn it off
+  if (P_active && (millis() - last_pump_activation_time >= 3000))
+  {
     digitalWrite(P_SPRAY_PIN, HIGH); // Turn off water pump (LED OFF)
     Serial.println("# Water Pump OFF");
     P_active = false;
   }
-  if (soilPercent < 50 && P_active == false && (millis() / 1000) - when_activated >= 10)
-  {                                 // If soil is dry and at least 10 seconds have passed since last activation
+  // Turn on the pump if soil is dry and it hasn't been activated in the last 10 seconds
+  if (!P_active && soilPercent < 50 && (millis() - last_pump_activation_time >= 10000))
+  {
     digitalWrite(P_SPRAY_PIN, LOW); // Turn on water pump (LED ON)
     Serial.println("# Water Pump ON");
     P_active = true;
-    when_activated = (millis() / 1000); // get current time
+    last_pump_activation_time = millis(); // record the time it was turned on
+  }
+  Serial.println("# ----------------------------------------");
+
+  if (temperature > 32)
+  {
+    Serial.println("# It's too hot!");
+    digitalWrite(BEEP_PIN, HIGH); // Turn on buzzer (LED ON)
+  }
+  else if (temperature < 20) // Corrected logic for "too cold"
+  {
+    Serial.println("# It's too cold!");
+    digitalWrite(BEEP_PIN, HIGH); // Turn off buzzer (LED OFF)
+  }
+  else
+  {
+    Serial.println("# Temperature is just right.");
+    digitalWrite(BEEP_PIN, LOW); // Turn off buzzer (LED OFF)
   }
   Serial.println("##########################################");
 
-  //
-  if ((millis() / 1000) - MQTT_activated >= 5)
-  { // Publish every 5 seconds
-    sprintf(msg, "{\"temp\": %.2f, \"humid\": %.2f, \"soil\": %d, \"soil_percent\": %d, \"soil_digital\": %d, \"ldr\": %d}",
+  // Publish data to MQTT every 5 seconds (non-blocking)
+  if (millis() - last_mqtt_publish_time >= 6000)
+  { // Publish every 5 seconds (5000 milliseconds)
+    sprintf(msg, "{\"temp\": %.2f, \"humid\": %.2f, \"soil\": %d, \"soil_percent\": %d, \"ldr\": %d}",
             temperature,
             humidity,
             soilAnalog,
             soilPercent,
-            soilDigital,
             ldrValue);
 
     Serial.print("Publishing JSON to topic '");
@@ -220,6 +247,7 @@ void loop()
     Serial.println(msg);
 
     client.publish(mqtt_publish_topic, msg);
-    MQTT_activated = (millis() / 1000); // get current time
+    last_mqtt_publish_time = current_time; // Update the last publish time
   }
 }
+
