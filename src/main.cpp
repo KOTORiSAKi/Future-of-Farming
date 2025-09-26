@@ -134,6 +134,8 @@ const long beep_duration = 500; // 0.5 วินาที
 float humidity;
 float temperature;
 
+unsigned long counter = 0;// for ldr not to have the light more than 24 hours
+
 void loop()
 {
   unsigned long currentMillis = millis();
@@ -201,6 +203,19 @@ void loop()
   Serial.print("# LDR Value : ");
   Serial.println(ldrValue);
   Serial.println("# ----------------------------------------");
+  if (ldrValue < 2000 && counter < 86400000) { // If it's dark and the light hasn't been on for more than 24 hours
+    digitalWrite(BEEP_PIN, HIGH); // Turn on LED (simulating light)
+    counter += sensor_read_interval; // Increment counter by the sensor read interval
+    Serial.println("# LDR: It's dark");
+  } else {
+    digitalWrite(BEEP_PIN, LOW); // Turn off LED (simulating light)
+    if (counter >= 86400000) {
+      Serial.println("# LDR: Light has been ON for 24 hours, take to the dark spot");
+    } else {
+      Serial.println("# LDR: It's bright");
+    }
+    counter = 0; // Reset counter when it's bright or after 24 hours
+  }
 
   static bool W_active = false; // Water spray status
   if (humidity < 70 && !W_active)
